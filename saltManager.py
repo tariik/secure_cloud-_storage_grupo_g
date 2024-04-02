@@ -4,7 +4,6 @@ from cryptography.hazmat.backends import default_backend
 import os
 import base64
 
-
 def derive_key(passphrase, generate_salt=False):
     salt = SaltManager(generate_salt)
 
@@ -16,7 +15,6 @@ def derive_key(passphrase, generate_salt=False):
         backend=default_backend()
     )
     return base64.urlsafe_b64encode(kdf.derive(passphrase))
-
 
 class SaltManager(object):
     def __init__(self, generate, path='.salt'):

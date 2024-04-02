@@ -6,3 +6,5 @@ pycparser==2.21
 bottle
 paste
 werkzeug
+pyOpenSSL
+cheroot
