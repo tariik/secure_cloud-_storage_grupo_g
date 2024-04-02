@@ -1,10 +1,7 @@
-from ast import arg
 import os
-import base64
 from cryptography.fernet import Fernet
 import getpass
 from saltManager import derive_key
-from cryptography.exceptions import InvalidKey, InvalidSignature
 
 
 class Client:
