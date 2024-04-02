@@ -8,10 +8,11 @@ import string
 from OpenSSL import crypto, SSL
 import base64
 
-BLOCK_SIZE = 1024 * 1024 # 1MB chunk size
+BLOCK_SIZE = 1024 * 1024  # 1MB chunk size
+
 
 def ssl_creat():
-     # Generate a new private key
+    # Generate a new private key
     key = crypto.PKey()
     key.generate_key(crypto.TYPE_RSA, 2048)
 
@@ -20,7 +21,7 @@ def ssl_creat():
     cert.get_subject().CN = "localhost"
     cert.set_serial_number(1000)
     cert.gmtime_adj_notBefore(0)
-    cert.gmtime_adj_notAfter(365*24*60*60)
+    cert.gmtime_adj_notAfter(365 * 24 * 60 * 60)
     cert.set_issuer(cert.get_subject())
     cert.set_pubkey(key)
     cert.sign(key, "sha256")
@@ -31,6 +32,7 @@ def ssl_creat():
     with open("cert.pem", "wb") as f:
         f.write(crypto.dump_certificate(crypto.FILETYPE_PEM, cert))
 
+
 def get_master_key():
     if not os.path.isfile("key.key"):
         key = Fernet.generate_key()
@@ -40,85 +42,85 @@ def get_master_key():
     with open("key.key", "rb") as key_file:
         return key_file.read().decode()
 
+
 def encrypt_file(file, master_key):
     with open(file, 'rb') as f:
-        original_file= f.read()
-    
-    f=Fernet(master_key)
-    encrypted=f.encrypt(original_file)
-    with open(file,'wb') as f:
+        original_file = f.read()
+
+    f = Fernet(master_key)
+    encrypted = f.encrypt(original_file)
+    with open(file, 'wb') as f:
         f.write(encrypted)
-        
+
 
 def decrypt_file(key, filename):
     f = Fernet(key)
     with open(filename, 'rb') as file:
         encrypted_file = file.read()
     return f.decrypt(encrypted_file)
-     
-    
-
 
 
 def generate_random_string(length):
     letters = string.ascii_lowercase
     return ''.join(random.choice(letters) for i in range(length))
 
+
 def encrypt_chunk(file):
-	# Generate a random encryption key and IV
-	key = os.urandom(32)
-	iv = os.urandom(16)
+    # Generate a random encryption key and IV
+    key = os.urandom(32)
+    iv = os.urandom(16)
 
-	# Create a list to store the metadata for each encrypted chunk
-	metadata_list = []
+    # Create a list to store the metadata for each encrypted chunk
+    metadata_list = []
 
-	# Open the input file and read it in chunks
-	with open(file, 'rb') as in_file:
+    # Open the input file and read it in chunks
+    with open(file, 'rb') as in_file:
 
-		chunk_index = 0
-		while True:
-			# Read a chunk of data from the input file
-			chunk_data = in_file.read(BLOCK_SIZE)
-			
-			# If there is no more data to read, break out of the loop
-			if not chunk_data:
-				break
-			
-			# Pad the chunk with zeroes if necessary
-			if len(chunk_data) < BLOCK_SIZE:
-				chunk_data += b'\x00' * (BLOCK_SIZE - len(chunk_data))
-			
-			# Encrypt the chunk with a randomly generated key and IV
-			cipher = AES.new(key, AES.MODE_CBC, iv)
-			encrypted_chunk = cipher.encrypt(chunk_data)
-			
-			# Write the encrypted chunk to a separate file
-			chunk_name = f'{generate_random_string(32)}-{file}'
-			chunk_path = os.path.join("chunk", chunk_name)
-			with open(chunk_path, 'wb') as out_file:
-				out_file.write(encrypted_chunk)
-			
-			# Add the metadata for the encrypted chunk to the metadata list
-			metadata_list.append({
-				'chunk_index': chunk_index,
-				'key': key,
-				'iv': iv,
-				'chunk_name': chunk_name
-			})
-			
-			# Generate a new random key and IV for the next chunk
-			key = os.urandom(32)
-			iv = os.urandom(16)
-			
-			# Increment the chunk index
-			chunk_index += 1
-	# Save the metadata list to a file
-	if not os.path.exists("metadata"):
-		os.makedirs("metadata")
-	meta_path = os.path.join("metadata", file)
-	with open(meta_path, 'wb') as metadata_file:
-		pickle.dump(metadata_list, metadata_file)
-                
+        chunk_index = 0
+        while True:
+            # Read a chunk of data from the input file
+            chunk_data = in_file.read(BLOCK_SIZE)
+
+            # If there is no more data to read, break out of the loop
+            if not chunk_data:
+                break
+
+            # Pad the chunk with zeroes if necessary
+            if len(chunk_data) < BLOCK_SIZE:
+                chunk_data += b'\x00' * (BLOCK_SIZE - len(chunk_data))
+
+            # Encrypt the chunk with a randomly generated key and IV
+            cipher = AES.new(key, AES.MODE_CBC, iv)
+            encrypted_chunk = cipher.encrypt(chunk_data)
+
+            # Write the encrypted chunk to a separate file
+            chunk_name = f'{generate_random_string(32)}-{file}'
+            chunk_path = os.path.join("chunk", chunk_name)
+            with open(chunk_path, 'wb') as out_file:
+                out_file.write(encrypted_chunk)
+
+            # Add the metadata for the encrypted chunk to the metadata list
+            metadata_list.append({
+                'chunk_index': chunk_index,
+                'key': key,
+                'iv': iv,
+                'chunk_name': chunk_name
+            })
+
+            # Generate a new random key and IV for the next chunk
+            key = os.urandom(32)
+            iv = os.urandom(16)
+
+            # Increment the chunk index
+            chunk_index += 1
+    # Save the metadata list to a file
+    if not os.path.exists("metadata"):
+        os.makedirs("metadata")
+    meta_path = os.path.join("metadata", file)
+    with open(meta_path, 'wb') as metadata_file:
+        pickle.dump(metadata_list, metadata_file)
+
+
 def decrypt_chunk(file):
     ##steeel not working
     # Load the metadata list from the file
@@ -149,28 +151,24 @@ def decrypt_chunk(file):
     decrypted_file = file.replace('.enc', '')
     with open(decrypted_file, 'wb') as out_file:
         out_file.write(decrypted_buffer)
-                
+
 
 def check_file_in_directories(file_name):
     metadata_dir = "metadata"
     storage_dir = "storage"
-    
+
     # Check if the file exists in the metadata directory
     metadata_path = os.path.join(metadata_dir, file_name)
     if os.path.exists(metadata_path):
         return metadata_dir
-    
+
     # Check if the file exists in the storage directory
     storage_path = os.path.join(storage_dir, file_name)
     if os.path.exists(storage_path):
         return storage_dir
-    
+
     # If the file doesn't exist in either directory, return None
     return 'file dosn''t exist'
-
-
-
-
 
 
 app = Flask(__name__)
@@ -182,7 +180,7 @@ def index():
     storage_dir = "storage"
     metadata_files = os.listdir(metadata_dir)
     storage_files = os.listdir(storage_dir)
-    html= """
+    html = """
 		<!DOCTYPE html>
 		<html>
 		<head>
@@ -248,16 +246,15 @@ def index():
 
 @app.route('/upload', methods=["POST"])
 def upload():
-    
     uploaded_files = request.files.getlist("file[]")
     selected_option = request.form.get("option")
     # Create the "uploads" folder if it doesn't exist
-    
+
     if selected_option == "Master_Key":
         if not os.path.exists("storage"):
             os.makedirs("storage")
         encrypted_files = []
-        master_key=get_master_key()
+        master_key = get_master_key()
         print(master_key)
         for file in uploaded_files:
             # Save the uploaded file to disk
@@ -265,7 +262,7 @@ def upload():
             file.save(file_path)
             # Encrypt the file with the master key
             encrypted_file = encrypt_file(file_path, master_key)
-        return "Files uploaded successfully!" 
+        return "Files uploaded successfully!"
     elif selected_option == "chunks":
         if not os.path.exists("chunk"):
             os.makedirs("chunk")
@@ -276,23 +273,25 @@ def upload():
             # Encrypt the file with the master key
             encrypted_file = encrypt_chunk(file_path)
         return "Files uploaded successfully!"
-    
+
+
 @app.route('/download', methods=["POST"])
 def download():
-    master_key=get_master_key()
+    master_key = get_master_key()
     print(master_key)
     selected_files = request.form.getlist('selected_files')
     # Faire quelque chose avec les fichiers sélectionnés
     for file_name in selected_files:
-        if(check_file_in_directories(file_name)=='storage'):
-             file_path = os.path.join("storage", file_name)
-             decrypt_file(master_key,file_path)
-        elif(check_file_in_directories(file_name)=='metadata'):
-             file_path = os.path.join("metadata", file_name)
-             decrypt_chunk(file_path)
-               
+        if (check_file_in_directories(file_name) == 'storage'):
+            file_path = os.path.join("storage", file_name)
+            decrypt_file(master_key, file_path)
+        elif (check_file_in_directories(file_name) == 'metadata'):
+            file_path = os.path.join("metadata", file_name)
+            decrypt_chunk(file_path)
+
     return "Fichiers sélectionnés: " + ", ".join(selected_files)
-     
+
+
 if __name__ == "__main__":
     ssl_creat()
     app.run(ssl_context=('cert.pem', 'key.pem'))

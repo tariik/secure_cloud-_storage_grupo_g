@@ -3,7 +3,6 @@ import time
 from dotenv import load_dotenv
 from google.cloud import kms
 
-
 '''
 !!! Ressources on how to use the KMS API !!!
 - Installation and basic access
@@ -15,6 +14,7 @@ from google.cloud import kms
 - Usage of asymmetric keys
     https://cloud.google.com/kms/docs/encrypt-decrypt-rsa    
 '''
+
 
 def get_key_rings():
     project_id, location_id = get_project_and_location_id()
@@ -31,6 +31,7 @@ def get_key_rings():
         print(key_ring.name)
         print(key_ring)
     return key_rings
+
 
 def create_key_ring(key_ring_id):
     """
@@ -50,6 +51,7 @@ def create_key_ring(key_ring_id):
         request={'parent': location_name, 'key_ring_id': key_ring_id, 'key_ring': key_ring})
     print('Created key ring: {}'.format(created_key_ring.name))
     return created_key_ring
+
 
 def create_symmetric_key(key_ring_id, key_id):
     """
@@ -79,15 +81,18 @@ def create_symmetric_key(key_ring_id, key_id):
     print('Created symmetric key: {}'.format(created_key.name))
     return created_key
 
+
 def build_location_name():
     '''Build the parent location name.'''
     project_id, location_id = get_project_and_location_id()
     return f'projects/{project_id}/locations/{location_id}'
 
+
 def get_project_and_location_id():
     project_id = os.getenv('PROJECT_ID')
     location_id = os.getenv('LOCATION_ID')
     return project_id, location_id
+
 
 def main():
     load_dotenv()

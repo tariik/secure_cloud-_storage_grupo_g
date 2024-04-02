@@ -3,40 +3,34 @@
 
 # source: https://github.com/cdgriffith/pyfiledrop
 
+import argparse
+import json
+import os
+import uuid
+from collections import defaultdict
 from pathlib import Path
 from threading import Lock
-from collections import defaultdict
-import shutil, os,  base64
-from google.cloud import kms as gkms
-import argparse
-import getpass
-import uuid, json
-from bottle import Bottle, route, run, request, error, response, HTTPError, static_file
-from werkzeug.utils import secure_filename
-from OpenSSL import crypto, SSL
-from cheroot.wsgi import Server as WSGIServer
-from cheroot.ssl.builtin import BuiltinSSLAdapter
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.backends import default_backend
-from saltManager import derive_key
-from cryptography.fernet import Fernet
-import access_google_kms as kms
-from google.api_core.exceptions import AlreadyExists
-import google.protobuf
+
 import boto3
+from bottle import Bottle, request, error, response, HTTPError, static_file
+from cheroot.ssl.builtin import BuiltinSSLAdapter
+from cheroot.wsgi import Server as WSGIServer
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from werkzeug.utils import secure_filename
+
+
 
 with open('credentials.json') as credentials:
     credentials = json.load(credentials)
 
 session = boto3.Session(
     aws_access_key_id=credentials['ACCESS_KEY_ID'],
-    aws_secret_access_key=credentials['SECRET_ACCESS_KEY'],
+    aws_secret_access_key= credentials['SECRET_ACCESS_KEY'],
     region_name=credentials['REGION_NAME']
 )
-kms = session.client("kms")
 
+kms = session.client("kms")
 
 storage_path: Path = Path(__file__).parent / "storage"
 chunk_path: Path = Path(__file__).parent / "chunk"
@@ -51,11 +45,10 @@ dropzone_parallel_chunks = "true"
 dropzone_force_chunking = "true"
 MASTER_KEY = None
 
-
-
 app = Bottle()
 lock = Lock()
 chucks = defaultdict(list)
+
 
 @error(500)
 def handle_500(error_message):
@@ -106,7 +99,7 @@ def upload():
         chunk_dir.mkdir(exist_ok=True, parents=True)
         chunk_keys.mkdir(exist_ok=True, parents=True)
         chunk_chunks.mkdir(exist_ok=True, parents=True)
-        
+
     # Save the individual chunk
     dek = generate_dek()
     nonce = os.urandom(12)
@@ -114,22 +107,20 @@ def upload():
     encryptor = cipher.encryptor()
 
     with open(chunk_chunks / str(current_chunk), "wb") as f:
-        encrypted_chunk = encrypt_chunk(dek,nonce,file.file.read())
+        encrypted_chunk = encrypt_chunk(dek, nonce, file.file.read())
         f.write(encrypted_chunk)
         data = {
-        "chunk_index": current_chunk,
-        "key": f"{chunk_dir}/keys/{current_chunk}.key",
-        "nonce": nonce.hex(),
-        "chunk_size": len(encrypted_chunk)
+            "chunk_index": current_chunk,
+            "key": f"{chunk_dir}/keys/{current_chunk}.key",
+            "nonce": nonce.hex(),
+            "chunk_size": len(encrypted_chunk)
         }
-        with open(chunk_dir /"config.json", "ab") as archivo:
+        with open(chunk_dir / "config.json", "ab") as archivo:
             archivo.write(json.dumps(data).encode("utf-8"))
 
-    with open(chunk_dir /"keys"/ f"{current_chunk}.key", "wb") as archivo:
+    with open(chunk_dir / "keys" / f"{current_chunk}.key", "wb") as archivo:
         dek_encripted = encryptor.update(dek)
         archivo.write(dek_encripted)
-
-
 
     # See if we have all the chunks downloaded
     with lock:
@@ -160,7 +151,7 @@ def download(name):
     cipher = Cipher(algorithm=algorithms.AES256(MASTER_KEY), mode=modes.GCM(nonce), backend=default_backend())
     decryptor = cipher.decryptor()
     print(data)
-    
+
     if not allow_downloads:
         raise HTTPError(status=403)
     for file in path.iterdir():
@@ -168,16 +159,19 @@ def download(name):
             return static_file(file.name, root=file.parent.absolute(), download=True)
     return HTTPError(status=404)
 
+
 def generate_dek():
-    dek = kms.generate_data_key(KeyId=credentials['KEY_ID'],KeySpec="AES_256")
+    dek = kms.generate_data_key(KeyId=credentials['KEY_ID'], KeySpec="AES_256")
     return dek["Plaintext"]
 
+
 def encrypt_chunk(dek, nonce, chunk):
-    cipher = chooseEncryptionAlgorithm(dek,nonce)
+    cipher = chooseEncryptionAlgorithm(dek, nonce)
     encrypted_chunk = cipher.encryptor().update(chunk)
     return encrypted_chunk
 
-def chooseEncryptionAlgorithm(key,nonce):
+
+def chooseEncryptionAlgorithm(key, nonce):
     if hasattr(args, 'encryption_algorithm'):
         case = args.encryption_algorithm.lower()
         if case == "aes":
@@ -185,7 +179,7 @@ def chooseEncryptionAlgorithm(key,nonce):
         elif case == "camellia":
             return Cipher(algorithm=algorithms.Camellia(key), mode=modes.CTR(nonce), backend=default_backend())
         elif case == "chacha20":
-            return Cipher(algorithm=algorithms.ChaCha20(key,nonce),mode=None, backend=default_backend())
+            return Cipher(algorithm=algorithms.ChaCha20(key, nonce), mode=None, backend=default_backend())
         else:
             return 'Authenticated encyption algorithm not found!'
     elif hasattr(args, 'encryption_algorithm_additionasl_data'):
@@ -193,7 +187,7 @@ def chooseEncryptionAlgorithm(key,nonce):
         if case == "aes":
             return Cipher(algorithm=algorithms.AES256(key), mode=modes.GCM(nonce), backend=default_backend())
         elif case == "chacha20":
-            return Cipher(algorithm=algorithms.ChaCha20(key, nonce),mode=None, backend=default_backend())
+            return Cipher(algorithm=algorithms.ChaCha20(key, nonce), mode=None, backend=default_backend())
         else:
             return 'Authenticated encyption and additional data algorithm not found!'
 
@@ -294,6 +288,7 @@ def get_base_html():
     </html>
     """
 
+
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", "--port", type=int, default=443, required=False)
@@ -319,10 +314,13 @@ def parse_args():
     parser.add_argument("--dz-cdn", type=str, default=None, required=False)
     parser.add_argument("--dz-version", type=str, default=None, required=False)
     parser.add_argument("-ae", "--encryption_algorithm", dest="encryption_algorithm",
-        choices=["aes", "camellia", "chacha20"], default="aes", help="the algorithm for authenticated encryption of messages")
+                        choices=["aes", "camellia", "chacha20"], default="aes",
+                        help="the algorithm for authenticated encryption of messages")
     parser.add_argument("-aead", "--encryption_algorithm_additional_data", dest="encryption_algorithm_additional_data",
-        choices=["aes", "chacha20"], default="aes", help="the algorithm for authenticated encryption and additional data of messages")
+                        choices=["aes", "chacha20"], default="aes",
+                        help="the algorithm for authenticated encryption and additional data of messages")
     return parser.parse_args()
+
 
 if __name__ == "__main__":
     args = parse_args()
@@ -363,9 +361,9 @@ Storage Path: {storage_path.absolute()}
 Chunk Path: {chunk_path.absolute()}
 """
     )
-    
-    if not(os.path.isfile("masterkey.key")):
-        MASTER_KEY =  os.urandom(32)
+
+    if not (os.path.isfile("masterkey.key")):
+        MASTER_KEY = os.urandom(32)
         with open("masterkey.key", "wb") as archivo:
             archivo.write(MASTER_KEY)
     else:
